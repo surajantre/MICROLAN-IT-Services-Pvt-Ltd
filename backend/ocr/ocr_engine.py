@@ -306,7 +306,7 @@ class TesseractAdapter(BaseOCRAdapter):
     LANG_MAP = {
         "en": "eng",
         "hi": "hin",
-        "mr": "hin",
+        "mr": "mar",
         "gu": "guj",
         "ta": "tam",
         "te": "tel",

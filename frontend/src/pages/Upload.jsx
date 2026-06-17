@@ -152,7 +152,7 @@ export default function Upload() {
                       </svg>
                     </div>
                     <p className="text-sm font-semibold text-slate-700">Drag invoice image file here</p>
-                    <p className="text-xs text-slate-400">JPEG, PNG, BMP, or PDF format limits (Max 10MB)</p>
+                    <p className="text-xs text-slate-400">JPEG, PNG or BMP format limits (Max 10MB)</p>
                     <div className="pt-2">
                       <label className="inline-flex items-center px-4 py-2 bg-white border border-slate-200 rounded-lg shadow-sm text-xs font-bold text-slate-700 hover:bg-slate-50 cursor-pointer">
                         Select Local File
