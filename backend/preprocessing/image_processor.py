@@ -9,9 +9,11 @@ Two pipeline variants:
   process()            - full pipeline including binarization (best for Latin/English)
   process_for_indic()  - stops before binarization (preserves Indic glyph strokes)
 """
+# from curses import meta
 import logging
 import math
 from typing import Tuple
+from matplotlib.pyplot import gray
 import numpy as np
 import cv2
 
@@ -99,11 +101,22 @@ class ImagePreprocessor:
     # ------------------------------------------------------------------ #
     # Step 4: Noise Removal - Gaussian + Median
     # ------------------------------------------------------------------ #
-    def _denoise(self, gray: np.ndarray, meta: dict) -> np.ndarray:
-        gaussian = cv2.GaussianBlur(gray, (3, 3), 0)
-        median = cv2.medianBlur(gaussian, 3)
-        meta["steps"].append("denoise(gaussian+median)")
-        return median
+    # def _denoise(self, gray: np.ndarray, meta: dict) -> np.ndarray:
+    #     gaussian = cv2.GaussianBlur(gray, (3, 3), 0)
+    #     median = cv2.medianBlur(gaussian, 3)
+    #     meta["steps"].append("denoise(gaussian+median)")
+    #     return median
+    def _denoise(self, gray, meta):
+
+        denoised = cv2.bilateralFilter(
+            gray,
+            9,
+            75,
+            75
+        )
+
+        meta["steps"].append("bilateral")
+        return denoised
 
     # ------------------------------------------------------------------ #
     # Step 5: Contrast Enhancement - CLAHE
@@ -117,22 +130,42 @@ class ImagePreprocessor:
     # ------------------------------------------------------------------ #
     # Step 6: Binarization - Adaptive + OTSU fallback
     # ------------------------------------------------------------------ #
-    def _binarize(self, gray: np.ndarray, meta: dict) -> np.ndarray:
-        adaptive = cv2.adaptiveThreshold(
-            gray, 255,
-            cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
-            cv2.THRESH_BINARY,
-            blockSize=15, C=8
+    # def _binarize(self, gray: np.ndarray, meta: dict) -> np.ndarray:
+    #     adaptive = cv2.adaptiveThreshold(
+    #         gray, 255,
+    #         cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
+    #         cv2.THRESH_BINARY,
+    #         blockSize=15, C=8
+    #     )
+    #     _, otsu = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+
+    #     adaptive_noise = self._estimate_noise(adaptive)
+    #     otsu_noise = self._estimate_noise(otsu)
+
+    #     result = adaptive if adaptive_noise <= otsu_noise else otsu
+    #     method = "adaptive" if adaptive_noise <= otsu_noise else "otsu"
+    #     meta["steps"].append(f"binarize({method})")
+    #     return result
+    def _binarize(self, gray, meta):
+
+        _, thresh = cv2.threshold(
+            gray,
+            0,
+            255,
+            cv2.THRESH_BINARY + cv2.THRESH_OTSU
         )
-        _, otsu = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
 
-        adaptive_noise = self._estimate_noise(adaptive)
-        otsu_noise = self._estimate_noise(otsu)
+        kernel = np.ones((2,2), np.uint8)
 
-        result = adaptive if adaptive_noise <= otsu_noise else otsu
-        method = "adaptive" if adaptive_noise <= otsu_noise else "otsu"
-        meta["steps"].append(f"binarize({method})")
-        return result
+        thresh = cv2.morphologyEx(
+            thresh,
+            cv2.MORPH_CLOSE,
+            kernel
+        )
+
+        meta["steps"].append("otsu+morph")
+
+        return thresh
 
     def _estimate_noise(self, binary: np.ndarray) -> float:
         """Estimate noise as ratio of isolated white pixels."""

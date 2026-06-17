@@ -8,6 +8,7 @@ Secondary: PaddleOCR (with version-safe init)
 Also: Google Vision, Azure Form Recognizer, AWS Textract
 """
 import logging
+import pytesseract
 import os
 import tempfile
 from abc import ABC, abstractmethod
@@ -300,7 +301,53 @@ class PaddleOCRAdapter(BaseOCRAdapter):
     def name(self) -> str:
         return "PaddleOCR"
 
+class TesseractAdapter(BaseOCRAdapter):
 
+    LANG_MAP = {
+        "en": "eng",
+        "hi": "hin",
+        "mr": "hin",
+        "gu": "guj",
+        "ta": "tam",
+        "te": "tel",
+        "auto": "eng",
+    }
+
+    def __init__(self):
+        pytesseract.pytesseract.tesseract_cmd = (
+            r"C:\Program Files\Tesseract-OCR\tesseract.exe"
+        )
+
+    def extract_text(
+        self,
+        image: np.ndarray,
+        language: str = "en"
+    ):
+        lang = self.LANG_MAP.get(language, "eng")
+
+        config = (
+            "--oem 3 "
+            "--psm 6 "
+            "-c preserve_interword_spaces=1"
+        )
+
+        text = pytesseract.image_to_string(
+            image,
+            lang=lang,
+            config=config
+        )
+
+        lines = [
+            line.strip()
+            for line in text.split("\n")
+            if line.strip()
+        ]
+
+        return lines, 0.85
+
+    @property
+    def name(self):
+        return "Tesseract"
 # -----------------------------------------------------------------------------
 # Cloud Adapters
 # -----------------------------------------------------------------------------
@@ -452,13 +499,21 @@ def convert_pdf_to_images_fallback(pdf_bytes: bytes) -> List[np.ndarray]:
 # -----------------------------------------------------------------------------
 
 def create_ocr_engine(provider: str = "easyocr", **kwargs) -> BaseOCRAdapter:
+    # adapters = {
+    #     "easyocr":   lambda: EasyOCRAdapter(use_gpu=kwargs.get("use_gpu", False)),
+    #     "paddleocr": lambda: PaddleOCRAdapter(use_gpu=kwargs.get("use_gpu", False)),
+    #     "google":    lambda: GoogleVisionAdapter(kwargs.get("credentials_path", "")),
+    #     "azure":     lambda: AzureFormRecognizerAdapter(
+    #                      kwargs.get("endpoint", ""), kwargs.get("key", "")),
+    #     "aws":       lambda: AWSTextractAdapter(kwargs.get("region", "us-east-1")),
+    # }
     adapters = {
-        "easyocr":   lambda: EasyOCRAdapter(use_gpu=kwargs.get("use_gpu", False)),
-        "paddleocr": lambda: PaddleOCRAdapter(use_gpu=kwargs.get("use_gpu", False)),
-        "google":    lambda: GoogleVisionAdapter(kwargs.get("credentials_path", "")),
-        "azure":     lambda: AzureFormRecognizerAdapter(
-                         kwargs.get("endpoint", ""), kwargs.get("key", "")),
-        "aws":       lambda: AWSTextractAdapter(kwargs.get("region", "us-east-1")),
+        "easyocr": lambda: EasyOCRAdapter(),
+        "paddleocr": lambda: PaddleOCRAdapter(),
+        "tesseract": lambda: TesseractAdapter(),
+        "google": lambda: GoogleVisionAdapter(),
+        "azure": lambda: AzureFormRecognizerAdapter(),
+        "aws": lambda: AWSTextractAdapter(),
     }
     factory = adapters.get(provider.lower())
     if not factory:

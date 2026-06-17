@@ -7,15 +7,24 @@ from pydantic import field_validator
 import os
 
 
+# class Settings(BaseSettings):
+#     # App
+#     APP_NAME: str = "Invoice OCR System"
+#     APP_VERSION: str = "1.0.0"
+#     DEBUG: bool = False
+#     SECRET_KEY: str = "your-super-secret-key-change-in-production-min-32-chars"
+#     ALGORITHM: str = "HS256"
+#     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24  # 24 hours
 class Settings(BaseSettings):
-    # App
-    APP_NAME: str = "Invoice OCR System"
+    APP_NAME: str = "OCR API"
+    DEBUG: bool = True
+    OCR_PROVIDER: str = "tesseract"
     APP_VERSION: str = "1.0.0"
-    DEBUG: bool = False
+    # DEBUG: bool = False
     SECRET_KEY: str = "your-super-secret-key-change-in-production-min-32-chars"
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24  # 24 hours
-
+    
     # Database
     DATABASE_URL: str = (
         "postgresql+asyncpg://postgres.rknmuphdrjptswxbtpqs:"
@@ -47,7 +56,8 @@ class Settings(BaseSettings):
     #   - No Gujarati (gu) model — falls back to English
     #   - Better accuracy for Hindi/Tamil/Telugu in clean images
     #   - Use paddlepaddle==3.0.0 + paddleocr==2.9.1 on Python 3.11+
-    OCR_PROVIDER: str = "easyocr"
+    # OCR_PROVIDER: str = "easyocr"
+    OCR_PROVIDER="tesseract"
 
     # GPU flag used by both EasyOCR and PaddleOCR
     PADDLE_USE_GPU: bool = False
