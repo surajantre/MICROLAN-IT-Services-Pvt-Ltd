@@ -1,3 +1,5 @@
+
+
 """Application Configuration"""
 from typing import List
 from pydantic_settings import BaseSettings
@@ -13,12 +15,13 @@ class Settings(BaseSettings):
     SECRET_KEY: str = "your-super-secret-key-change-in-production-min-32-chars"
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24  # 24 hours
-    PADDLE_USE_GPU = False
+
     # Database
     DATABASE_URL: str = (
-    "postgresql+asyncpg://postgres.rknmuphdrjptswxbtpqs:"
-    "Suraj%40supabase%23123@aws-1-ap-northeast-2.pooler.supabase.com:5432/postgres"
+        "postgresql+asyncpg://postgres.rknmuphdrjptswxbtpqs:"
+        "Suraj%40supabase%23123@aws-1-ap-northeast-2.pooler.supabase.com:5432/postgres"
     )
+
     # Redis
     REDIS_URL: str = "redis://localhost:6379/0"
 
@@ -34,11 +37,19 @@ class Settings(BaseSettings):
     UPLOAD_DIR: str = "/tmp/invoice_uploads"
     ALLOWED_EXTENSIONS: List[str] = [".jpg", ".jpeg", ".png", ".tiff", ".bmp", ".pdf"]
 
-    # OCR Provider: "paddleocr" | "google" | "azure" | "aws"
-    OCR_PROVIDER: str = "paddleocr"
+    # OCR Provider: "easyocr" | "paddleocr" | "google" | "azure" | "aws"
+    #
+    # EasyOCR is the recommended default:
+    #   - Works on Python 3.11 + Windows without version conflicts
+    #   - Has native models for: en, hi, mr (via hi), gu, ta, te
+    #
+    # PaddleOCR note:
+    #   - No Gujarati (gu) model — falls back to English
+    #   - Better accuracy for Hindi/Tamil/Telugu in clean images
+    #   - Use paddlepaddle==3.0.0 + paddleocr==2.9.1 on Python 3.11+
+    OCR_PROVIDER: str = "easyocr"
 
-    # PaddleOCR
-    PADDLE_LANG: str = "en"  # default, auto-detected per request
+    # GPU flag used by both EasyOCR and PaddleOCR
     PADDLE_USE_GPU: bool = False
 
     # Google Vision (optional)

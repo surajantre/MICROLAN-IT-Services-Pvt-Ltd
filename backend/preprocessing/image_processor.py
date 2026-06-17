@@ -1,10 +1,17 @@
+
+
+
 """
 OpenCV Image Preprocessing Pipeline
-Steps: Validate → Denoise → Enhance → Binarize → Deskew → Segment
+Steps: Validate -> Denoise -> Enhance -> Binarize -> Deskew -> Segment
+
+Two pipeline variants:
+  process()            - full pipeline including binarization (best for Latin/English)
+  process_for_indic()  - stops before binarization (preserves Indic glyph strokes)
 """
 import logging
 import math
-from typing import Tuple, Optional
+from typing import Tuple
 import numpy as np
 import cv2
 
@@ -20,38 +27,46 @@ class ImagePreprocessor:
 
     def process(self, image_bytes: bytes) -> Tuple[np.ndarray, dict]:
         """
-        Full pipeline: validate → denoise → enhance → binarize → deskew.
+        Full pipeline: validate -> denoise -> enhance -> binarize -> deskew.
+        Best for Latin/English text.
         Returns (processed_image_ndarray, metadata_dict).
         """
         meta = {"steps": [], "warnings": []}
 
-        # Step 1: Decode
         image = self._decode(image_bytes, meta)
-
-        # Step 2: Validate
         self._validate(image, meta)
-
-        # Step 3: Grayscale
         gray = self._to_gray(image, meta)
-
-        # Step 4: Noise Removal
         denoised = self._denoise(gray, meta)
-
-        # Step 5: Contrast Enhancement
         enhanced = self._enhance_contrast(denoised, meta)
-
-        # Step 6: Binarization
         binary = self._binarize(enhanced, meta)
-
-        # Step 7: Skew Detection & Deskew
         deskewed = self._deskew(binary, meta)
 
         meta["output_shape"] = deskewed.shape
-        logger.info("Preprocessing complete. Steps: %s", meta["steps"])
+        logger.info("Preprocessing complete (full). Steps: %s", meta["steps"])
+        return deskewed, meta
+
+    def process_for_indic(self, image_bytes: bytes) -> Tuple[np.ndarray, dict]:
+        """
+        Lite pipeline for Indic scripts: validate -> denoise -> enhance -> deskew.
+        Skips binarization — adaptive threshold destroys curved Devanagari/Tamil strokes
+        and causes EasyOCR/PaddleOCR to miss characters. Grayscale + CLAHE is sufficient.
+        Returns (processed_image_ndarray, metadata_dict).
+        """
+        meta = {"steps": [], "warnings": []}
+
+        image = self._decode(image_bytes, meta)
+        self._validate(image, meta)
+        gray = self._to_gray(image, meta)
+        denoised = self._denoise(gray, meta)
+        enhanced = self._enhance_contrast(denoised, meta)
+        deskewed = self._deskew(enhanced, meta)
+
+        meta["output_shape"] = deskewed.shape
+        logger.info("Preprocessing complete (indic-safe). Steps: %s", meta["steps"])
         return deskewed, meta
 
     # ------------------------------------------------------------------ #
-    # Step 1: Decode bytes → ndarray
+    # Step 1: Decode bytes -> ndarray
     # ------------------------------------------------------------------ #
     def _decode(self, image_bytes: bytes, meta: dict) -> np.ndarray:
         arr = np.frombuffer(image_bytes, np.uint8)
@@ -85,9 +100,7 @@ class ImagePreprocessor:
     # Step 4: Noise Removal - Gaussian + Median
     # ------------------------------------------------------------------ #
     def _denoise(self, gray: np.ndarray, meta: dict) -> np.ndarray:
-        # Gaussian blur to smooth out noise
         gaussian = cv2.GaussianBlur(gray, (3, 3), 0)
-        # Median filter for salt-and-pepper noise
         median = cv2.medianBlur(gaussian, 3)
         meta["steps"].append("denoise(gaussian+median)")
         return median
@@ -105,17 +118,14 @@ class ImagePreprocessor:
     # Step 6: Binarization - Adaptive + OTSU fallback
     # ------------------------------------------------------------------ #
     def _binarize(self, gray: np.ndarray, meta: dict) -> np.ndarray:
-        # Try adaptive thresholding first (better for uneven lighting)
         adaptive = cv2.adaptiveThreshold(
             gray, 255,
             cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
             cv2.THRESH_BINARY,
             blockSize=15, C=8
         )
-        # Also compute OTSU for comparison
         _, otsu = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
 
-        # Choose the one with better text visibility (lower noise ratio)
         adaptive_noise = self._estimate_noise(adaptive)
         otsu_noise = self._estimate_noise(otsu)
 
@@ -138,10 +148,10 @@ class ImagePreprocessor:
         angle = self._detect_skew(binary)
         meta["skew_angle"] = round(angle, 2)
         if abs(angle) < 0.5:
-            meta["steps"].append("deskew(skipped, angle<0.5°)")
+            meta["steps"].append("deskew(skipped, angle<0.5deg)")
             return binary
         rotated = self._rotate(binary, angle)
-        meta["steps"].append(f"deskew(rotated {angle:.1f}°)")
+        meta["steps"].append(f"deskew(rotated {angle:.1f}deg)")
         return rotated
 
     def _detect_skew(self, binary: np.ndarray) -> float:
